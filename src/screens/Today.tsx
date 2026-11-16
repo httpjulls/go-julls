@@ -11,7 +11,7 @@ import { diffDays, formatDay, formatMinutes } from '../core/dates';
 import { SUBJECT_SHORT } from '../core/exam';
 import { replay } from '../core/sm2';
 import { Card, Icon, MasteryPicker, Page, Section, Sheet, Stepper, cx } from '../ui/kit';
-import { buzz, scheduleReminders } from '../native/native';
+import { buzz, isNative, scheduleReminders } from '../native/native';
 import { checkForUpdate, type LatestInfo } from '../native/update';
 
 const KIND_LABEL: Record<string, string> = { study: 'conteúdo novo', review: 'revisão', essay: 'redação', mock: 'simulado', light: 'revisão leve' };
@@ -30,8 +30,8 @@ export default function Today() {
   const [update, setUpdate] = useState<LatestInfo | null>(null);
   const generating = useRef(false);
 
-  useEffect(() => {
-    void checkForUpdate().then(setUpdate);
+    useEffect(() => {
+    if (isNative()) void checkForUpdate().then(setUpdate);
   }, []);
 
   // Gera o plano do dia uma vez (fica estável durante o dia).
