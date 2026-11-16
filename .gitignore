@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.txt/
+*.log
+.env
+.env.*
+!.env.example
+# keystore e senhas NUNCA vão para o repositório
+*.jks
+*.keystore
+keystore.properties
+android/app/release/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+release/

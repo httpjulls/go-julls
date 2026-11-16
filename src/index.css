@@ -1,0 +1,132 @@
+@import '@fontsource-variable/inter';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Paleta "Go, Julls!" — valores RGB para permitir opacidade no Tailwind.
+   Contrastes conferidos em tests/contrast.test.ts (mínimo 4,5:1 para texto). */
+:root,
+:root[data-theme='dark'] {
+  --bg: 11 11 15; /* #0B0B0F */
+  --surface: 22 22 29; /* #16161D */
+  --elevated: 31 31 41; /* #1F1F29 */
+  --line: 42 42 54; /* #2A2A36 */
+  --pink: 255 46 147; /* #FF2E93 */
+  --pinkv: 255 92 170; /* #FF5CAA */
+  --pinks: 255 179 217; /* #FFB3D9 */
+  --pinkp: 255 224 240; /* #FFE0F0 */
+  --accent: 255 92 170; /* rosa como texto sobre fundo escuro */
+  --ink: 255 255 255;
+  --muted: 201 201 214; /* #C9C9D6 */
+  --warn: 255 176 32; /* #FFB020 */
+  --onpink: 11 11 15; /* texto sobre botão rosa */
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: 255 245 250; /* #FFF5FA */
+  --surface: 255 255 255;
+  --elevated: 255 232 243; /* #FFE8F3 */
+  --line: 245 200 222; /* #F5C8DE */
+  --pink: 255 46 147;
+  --pinkv: 255 92 170;
+  --pinks: 194 24 91; /* #C2185B (realces legíveis no claro) */
+  --pinkp: 136 14 79; /* #880E4F */
+  --accent: 173 20 87; /* #AD1457 rosa escuro: texto legível no fundo claro */
+  --ink: 26 26 34; /* #1A1A22 */
+  --muted: 74 74 90; /* #4A4A5A */
+  --warn: 138 84 0; /* #8A5400 alerta legível no claro */
+  --onpink: 11 11 15;
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  margin: 0;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--pinkv));
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-line rounded-2xl p-4;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-xl font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-pink text-onpink;
+  }
+  .btn-ghost {
+    @apply btn bg-elevated text-ink border border-line;
+  }
+  .btn-text {
+    @apply btn bg-transparent text-accent px-2;
+  }
+  .input {
+    @apply w-full min-h-[48px] rounded-xl bg-elevated border border-line px-3 py-2 text-ink placeholder:text-muted/70 focus:border-pink outline-none;
+  }
+  .label {
+    @apply block text-sm text-muted mb-1;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-3 min-h-[32px] text-sm border border-line bg-elevated text-ink;
+  }
+  .chip-on {
+    @apply chip bg-pink text-onpink border-pink;
+  }
+}
+
+/* Markdown renderizado */
+.md h1, .md h2, .md h3 { @apply font-bold text-ink mt-3 mb-1; }
+.md h1 { @apply text-xl; }
+.md h2 { @apply text-lg; }
+.md p { @apply my-2; }
+.md ul { @apply list-disc pl-5 my-2; }
+.md ol { @apply list-decimal pl-5 my-2; }
+.md li { @apply my-1; }
+.md strong { @apply text-accent font-semibold; }
+.md code { @apply bg-elevated rounded px-1; }
+.md blockquote { @apply border-l-4 border-pink/60 pl-3 text-muted my-2; }
+.md a { @apply text-accent underline; }
+.md img { @apply rounded-xl my-2 max-w-full; }
+.md table { @apply my-2 text-sm; }
+.md td, .md th { @apply border border-line px-2 py-1; }
+
+/* Folha de redação: 25 linhas pautadas */
+.essay-sheet {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(2rem - 1px),
+    rgb(var(--line)) calc(2rem - 1px),
+    rgb(var(--line)) 2rem
+  );
+  line-height: 2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
