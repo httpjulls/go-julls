@@ -6,6 +6,11 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "5174", "--strictPort"],
       "port": 5174
+    },
+    {
+      "name": "gojulls-dist",
+      "url": "http://localhost:5175",
+      "port": 5175
     }
   ]
 }

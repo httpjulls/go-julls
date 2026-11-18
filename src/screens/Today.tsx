@@ -10,6 +10,7 @@ import { assessRisks, projectScore, weightedMastery } from '../core/projection';
 import { diffDays, formatDay, formatMinutes } from '../core/dates';
 import { SUBJECT_SHORT } from '../core/exam';
 import { replay } from '../core/sm2';
+import { materialForTopic } from '../data/materials';
 import { Card, Icon, MasteryPicker, Page, Section, Sheet, Stepper, cx } from '../ui/kit';
 import { buzz, isNative, scheduleReminders } from '../native/native';
 import { checkForUpdate, type LatestInfo } from '../native/update';
@@ -159,6 +160,11 @@ export default function Today() {
                         <button className="btn-primary flex-1" onClick={() => start(b)}>
                           <Icon name="play" size={18} /> {b.kind === 'essay' ? 'Escrever' : b.kind === 'mock' ? 'Fazer simulado' : 'Iniciar foco'}
                         </button>
+                        {b.topicId && materialForTopic(b.topicId) && (
+                          <Link to={`/material/${materialForTopic(b.topicId)!.id}`} className="btn-ghost" aria-label="Ler material do tópico">
+                            <Icon name="book" size={18} /> <span className="hidden tab:inline">Material</span>
+                          </Link>
+                        )}
                         <button className="btn-ghost" onClick={() => setClosing(b)}>
                           <Icon name="check" size={18} /> Concluí
                         </button>
@@ -200,6 +206,9 @@ export default function Today() {
               </Link>
               <Link to="/formulario" className="btn-ghost">
                 <Icon name="sigma" size={18} /> Fórmulas
+              </Link>
+              <Link to="/cronograma" className="btn-ghost col-span-2">
+                <Icon name="calendar" size={18} /> Cronograma até a prova
               </Link>
             </div>
           </Section>

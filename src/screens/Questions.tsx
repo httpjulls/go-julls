@@ -12,6 +12,8 @@ import { dayKey } from '../core/dates';
 import { parseQuestion } from '../core/parseQuestion';
 import { Card, Empty, Icon, Markdown, Page, Section, Segmented, Sheet, cx } from '../ui/kit';
 import { ErrorSheet } from './Errors';
+import ImportExam from './ImportExam';
+import { QuestionImages } from '../app/attachments';
 import { buzz } from '../native/native';
 
 const LETTERS: Letter[] = ['A', 'B', 'C', 'D'];
@@ -21,6 +23,7 @@ export default function Questions() {
     <Routes>
       <Route index element={<Bank />} />
       <Route path="praticar" element={<Practice />} />
+      <Route path="importar" element={<ImportExam />} />
     </Routes>
   );
 }
@@ -47,18 +50,49 @@ function Bank() {
   const [editing, setEditing] = useState<Partial<Question> | null>(null);
   const [subject, setSubject] = useState<SubjectId | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [exam, setExam] = useState<string>('all');
+  const exams = [...new Map(bank.filter((x) => x.q.examId).map((x) => [x.q.examId!, x.q.examName ?? x.q.examId!])).entries()];
 
-  const list = bank.filter(
-    ({ q }) => (!topicFilter || q.topicId === topicFilter) && (subject === 'all' || q.subject === subject) && (!search || q.statement.toLowerCase().includes(search.toLowerCase())),
-  );
+  const list = bank
+    .filter(
+      ({ q }) =>
+        (!topicFilter || q.topicId === topicFilter) &&
+        (subject === 'all' || q.subject === subject) &&
+        (exam === 'all' || q.examId === exam) &&
+        (!search || q.statement.toLowerCase().includes(search.toLowerCase())),
+    )
+    .sort((a, b) => (a.q.examId ?? '').localeCompare(b.q.examId ?? '') || (a.q.number ?? 0) - (b.q.number ?? 0));
   const wrong = list.filter((x) => x.last && !x.last.correct).length;
   const qs = new URLSearchParams();
   if (topicFilter) qs.set('topic', topicFilter);
   if (subject !== 'all') qs.set('subject', subject);
+  if (exam !== 'all') qs.set('exam', exam);
 
   return (
     <Page title="Banco de questões" actions={<button className="btn-primary" onClick={() => setEditing({ subject: (topics.find((t) => t.id === topicFilter)?.subject as SubjectId) ?? 'mat', topicId: topicFilter })}><Icon name="plus" /> Nova</button>}>
-      <p className="text-sm text-muted mb-4">Suas questões: cadastre ou cole (enunciado, alternativas A–D, gabarito). O app não traz provas prontas.</p>
+      <p className="text-sm text-muted mb-4">Suas questões: importe provas em PDF, cadastre ou cole (enunciado, alternativas A–D, gabarito).</p>
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <button className="btn-ghost" onClick={() => nav('/questoes/importar')}>
+          <Icon name="upload" /> Importar prova (PDF)
+        </button>
+        <button
+          className="btn-ghost"
+          disabled={!list.length}
+          onClick={() => nav(`/listas/nova?${new URLSearchParams({ ...(topicFilter ? { topic: topicFilter } : {}), ...(subject !== 'all' ? { subject } : {}), ...(exam !== 'all' ? { exam } : {}) })}`)}
+        >
+          <Icon name="download" /> Gerar PDF de lista
+        </button>
+      </div>
+      {exams.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          <button className={exam === 'all' ? 'chip-on' : 'chip'} onClick={() => setExam('all')}>Todas as fontes</button>
+          {exams.map(([id, label]) => (
+            <button key={id} className={exam === id ? 'chip-on whitespace-nowrap' : 'chip whitespace-nowrap'} onClick={() => setExam(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2 mb-5">
         <button className="btn-primary" disabled={!list.length} onClick={() => nav(`/questoes/praticar?${qs}`)}>
           <Icon name="play" /> Praticar ({list.length})
@@ -150,6 +184,7 @@ function QuestionEditor({ value, onClose }: { value: Partial<Question> | null; o
         ) : (
           <>
             <textarea className="input min-h-[120px]" placeholder="Enunciado (aceita Markdown)" value={q.statement ?? ''} onChange={(e) => setQ({ ...q, statement: e.target.value })} />
+            <QuestionImages ids={q.images} />
             {LETTERS.map((L) => (
               <div key={L} className="flex gap-2 items-center">
                 <button className={cx('w-12 shrink-0', q.answer === L ? 'btn-primary' : 'btn-ghost')} aria-label={`Marcar ${L} como correta`} aria-pressed={q.answer === L} onClick={() => setQ({ ...q, answer: L })}>
@@ -181,6 +216,7 @@ function Practice() {
   const bank = useBank();
   const topic = params.get('topic');
   const subject = params.get('subject');
+  const exam = params.get('exam');
   const onlyWrong = params.get('modo') === 'erradas';
   const [queue, setQueue] = useState<string[] | null>(null);
   const [idx, setIdx] = useState(0);
@@ -193,15 +229,18 @@ function Practice() {
   useEffect(() => {
     if (!bank || queue) return;
     const ids = bank
-      .filter(({ q }) => (!topic || q.topicId === topic) && (!subject || q.subject === subject))
+      .filter(({ q }) => (!topic || q.topicId === topic) && (!subject || q.subject === subject) && (!exam || q.examId === exam))
       .filter((x) => !onlyWrong || (x.last && !x.last.correct))
+      .sort((a, b) => (a.q.number ?? 0) - (b.q.number ?? 0))
       .map((x) => x.q.id);
-    for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ids[i], ids[j]] = [ids[j], ids[i]];
-    }
+    // de um material ou prova: na ordem; senão, embaralha
+    if (!exam)
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
     setQueue(ids);
-  }, [bank, queue, topic, subject, onlyWrong]);
+  }, [bank, queue, topic, subject, exam, onlyWrong]);
 
   const q = useMemo(() => bank?.find((x) => x.q.id === queue?.[idx])?.q, [bank, queue, idx]);
 
@@ -253,7 +292,9 @@ function Practice() {
             Questão {idx + 1} de {queue.length} · {SUBJECT_SHORT[q.subject]} · {stats.c}✓ {stats.w}✗
           </p>
           <Card>
+            {q.examName && <p className="text-xs text-accent font-semibold mb-1">{q.examName} · questão {q.number}</p>}
             <Markdown text={q.statement} />
+            <QuestionImages ids={q.images} />
           </Card>
           <div className="space-y-2 mt-3">
             {LETTERS.map((L) => {

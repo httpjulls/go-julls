@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
-import { repo, nowIso } from '../db/repo';
-import type { Letter, MockExam, Question, QuestionAttempt } from '../db/types';
+import { repo } from '../db/repo';
+import type { Letter, MockExam, Question } from '../db/types';
 import { useApp } from '../app/AppContext';
 import { completeStudy } from '../app/actions';
-import { EXAM, EXAM_ORDER, SUBJECT_SHORT, fmt, scoreExam, type ObjectiveResult, type SubjectId } from '../core/exam';
+import { gradeMock } from '../app/grading';
+import { QuestionImages } from '../app/attachments';
+import { EXAM, EXAM_ORDER, SUBJECT_SHORT, fmt, type SubjectId } from '../core/exam';
 import { dayKey, formatDay } from '../core/dates';
 import { Card, Disclaimer, Empty, Icon, Markdown, Page, Section, Toggle, cx } from '../ui/kit';
 import { keepAwake } from '../native/native';
@@ -25,13 +27,41 @@ export default function Mock() {
 function List() {
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const mocks = (useLiveQuery(() => db.mock_exams.orderBy('day').reverse().toArray(), []) ?? []).filter((m) => !m.deleted);
-  const questions = (useLiveQuery(() => db.questions.toArray(), []) ?? []).filter((q) => !q.deleted);
+  const { settings } = useApp();
+  const mocks = (useLiveQuery(() => db.mock_exams.orderBy('day').reverse().toArray(), []) ?? []).filter((m) => !m.deleted && m.kind !== 'lista');
+  const lang = settings?.foreignLanguage;
+  const questions = (useLiveQuery(() => db.questions.toArray(), []) ?? []).filter((q) => !q.deleted && (q.subject !== 'lem' || !q.language || q.language === lang));
   const [noCalc, setNoCalc] = useState(true);
+  const exams = [...new Map(questions.filter((q) => q.examId).map((q) => [q.examId!, q.examName ?? q.examId!])).entries()];
+  const [examSel, setExamSel] = useState('');
 
   const avail = EXAM_ORDER.map(({ subject, count }) => ({ subject, count, have: questions.filter((q) => q.subject === subject).length }));
   const totalHave = avail.reduce((s, a) => s + Math.min(a.have, a.count), 0);
   const running = mocks.find((m) => !m.finishedAt);
+
+  /** Prova importada: todas as questões do caderno, na ordem original, com 3h cronometradas. */
+  const startExam = async () => {
+    const id = examSel || exams[0]?.[0];
+    if (!id) return;
+    const qs = questions.filter((q) => q.examId === id).sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+    const slots: MockExam['slots'] = qs.map((q) => ({ subject: q.subject, questionId: q.id }));
+    const m = await repo.put<MockExam>('mock_exams', {
+      kind: 'prova',
+      title: qs[0]?.examName ?? 'Prova importada',
+      examId: id,
+      durationMin: EXAM.durationMin,
+      day: dayKey(),
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      noCalc,
+      slots,
+      answers: slots.map(() => null),
+      essayId: null,
+      essayScore: null,
+      result: null,
+    });
+    nav(`/simulado/${m.id}${params.get('plan') ? `?plan=${params.get('plan')}` : ''}`);
+  };
 
   const start = async () => {
     const used = new Set<string>();
@@ -46,6 +76,9 @@ function List() {
       }
     }
     const m = await repo.put<MockExam>('mock_exams', {
+      kind: 'simulado',
+      title: 'Simulado sorteado do banco',
+      durationMin: EXAM.durationMin,
       day: dayKey(),
       startedAt: new Date().toISOString(),
       finishedAt: null,
@@ -87,8 +120,36 @@ function List() {
         )}
         <Toggle label="Modo sem calculadora e sem consulta" checked={noCalc} onChange={setNoCalc} />
         <button className="btn-primary w-full" disabled={totalHave === 0} onClick={() => void start()}>
-          <Icon name="play" /> Começar simulado (3h)
+          <Icon name="play" /> Sortear simulado do banco (3h)
         </button>
+      </Card>
+
+      <Card className="mb-5 space-y-3">
+        <p className="font-semibold">Refazer uma prova importada</p>
+        {exams.length === 0 ? (
+          <p className="text-sm text-muted">
+            Importe um caderno em PDF em <button className="text-accent underline" onClick={() => nav('/questoes/importar')}>Questões → Importar prova</button> para fazê-lo inteiro, na ordem, com 3h cronometradas.
+          </p>
+        ) : (
+          <>
+            <select className="input" value={examSel || exams[0][0]} onChange={(e) => setExamSel(e.target.value)} aria-label="Prova">
+              {exams.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label} ({questions.filter((q) => q.examId === id).length} questões)
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <button className="btn-primary" onClick={() => void startExam()}>
+                <Icon name="timer" /> Fazer no app (3h)
+              </button>
+              <button className="btn-ghost" onClick={() => nav(`/listas/nova?exam=${examSel || exams[0][0]}&prova=1`)}>
+                <Icon name="download" /> PDF para fazer no papel
+              </button>
+            </div>
+            <p className="text-xs text-muted">No papel: depois, em Listas e PDFs → Corrigir, você marca o que acertou e errou pelo número.</p>
+          </>
+        )}
       </Card>
 
       <Section title="Histórico">
@@ -157,35 +218,16 @@ function Run() {
     }
   }, [mock, essay]);
 
-  const leftMs = mock ? Date.parse(mock.startedAt) + EXAM.durationMin * 60000 - now : 0;
+  const leftMs = mock ? Date.parse(mock.startedAt) + (mock.durationMin ?? EXAM.durationMin) * 60000 - now : 0;
 
   const finish = async () => {
     if (!mock || !qs) return;
-    const results: ObjectiveResult[] = [];
-    const attempts: Omit<QuestionAttempt, 'id' | 'updated_at' | 'device_id'>[] = [];
-    for (const { subject } of EXAM_ORDER) {
-      let correct = 0;
-      let total = 0;
-      mock.slots.forEach((s, i) => {
-        if (s.subject !== subject || !s.questionId) return;
-        const q = qs.get(s.questionId);
-        if (!q) return;
-        total++;
-        const ans = mock.answers[i];
-        if (ans === q.answer) correct++;
-        attempts.push({ questionId: q.id, subject: q.subject, topicId: q.topicId, chosen: ans, correct: ans === q.answer, seconds: 0, day: dayKey(), at: nowIso(), mockId: mock.id });
-      });
-      if (total) results.push({ subject, correct, total });
-    }
-    const r = scoreExam(results, mock.essayScore);
-    const partial = results.reduce((s, x) => s + x.total, 0) < 45;
-    const reasons = partial ? [...r.reasons, 'Simulado parcial: só as posições com questão do seu banco entraram na nota.'] : r.reasons;
-    if (r.eliminated && results.some((x) => x.correct === 0 && x.total < 6)) reasons.push('Com menos de 6 questões numa disciplina, o “zero” pode não refletir a prova real.');
-    for (const a of attempts) await repo.append<QuestionAttempt>('question_attempts', a);
-    await repo.update<MockExam>('mock_exams', mock.id, { finishedAt: new Date().toISOString(), result: { n1: r.n1, n2: r.n2, nf: r.nf, eliminated: r.eliminated, reasons, bySubject: r.bySubject } });
+    // questão sem marcação conta como errada (marcação obrigatória na prova real)
+    const marks = mock.slots.map((s, i) => (s.questionId ? { chosen: mock.answers[i] ?? null, correct: mock.answers[i] ? undefined : false } : undefined));
+    const { wrong } = await gradeMock(mock, qs, marks);
     const minutes = Math.round((Date.now() - Date.parse(mock.startedAt)) / 60000);
     await completeStudy({ topicId: null, subject: 'mat', minutes: Math.min(minutes, 240), kind: 'mock', planItemId: params.get('plan') ?? undefined });
-    toast('Simulado concluído. Orgulho!');
+    toast(wrong ? `Simulado concluído. ${wrong} erradas foram para o banco de erros.` : 'Simulado concluído. Orgulho!');
   };
 
   // Tempo esgotado: encerra automaticamente
@@ -222,6 +264,7 @@ function Run() {
             <Icon name="timer" size={14} /> {clock(leftMs)}
           </span>
           <span className="chip">{answered}/{available} marcadas</span>
+          {mock.title && <span className="chip text-xs hidden tab:inline-flex">{mock.title}</span>}
           {mock.noCalc && <span className="chip text-xs hidden tab:inline-flex">sem calculadora · sem consulta</span>}
           <span className="flex-1" />
           <button className="btn-primary" onClick={() => confirm('Entregar o simulado agora?') && void finish()}>Entregar</button>
@@ -235,7 +278,9 @@ function Run() {
             {q ? (
               <>
                 <Card>
+                  {q.examName && <p className="text-xs text-accent font-semibold mb-1">{q.examName} · nº {q.number}</p>}
                   <Markdown text={q.statement} />
+                  <QuestionImages ids={q.images} />
                 </Card>
                 <div className="space-y-2 mt-3">
                   {LETTERS.map((L) => (
@@ -258,7 +303,7 @@ function Run() {
             )}
             <div className="flex gap-2 mt-4">
               <button className="btn-ghost flex-1" disabled={cur === 0} onClick={() => setCur(cur - 1)}>Anterior</button>
-              <button className="btn-ghost flex-1" disabled={cur === 44} onClick={() => setCur(cur + 1)}>Próxima</button>
+              <button className="btn-ghost flex-1" disabled={cur === mock.slots.length - 1} onClick={() => setCur(cur + 1)}>Próxima</button>
             </div>
           </div>
           <aside className="mt-6 tab:mt-0">

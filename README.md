@@ -121,6 +121,16 @@ Workflow: `.github/workflows/android.yml`.
 
 **Pesos na nota final (de 100):** Redação 37 · Matemática 15 · Física 15 · Português 6 · Biologia 6 · Química 6 · Geografia 6 · História 6 · Língua estrangeira 3.
 
+### Novidades da v1.1.0
+
+- **Cronograma** (Mais → Cronograma): previsão dia a dia até a prova, rodando o planejador como se cada bloco fosse cumprido (`src/core/schedule.ts`). Se um dia não der, o resto se ajusta sozinho. O simulado da reta final agora cai num dia longo até 9 dias antes da prova (pega o fim de semana); sem dia longo, entra um simulado parcial a 3–4 dias.
+- **Importar prova em PDF** (Questões → Importar prova): o app lê o caderno com pdf.js (offline), separa as duas colunas, encontra as questões 01–45 e as alternativas (A)–(D), aplica o gabarito (PDF separado, texto colado ou seção "Gabarito" no mesmo PDF), recorta cada questão da página como imagem (figuras e fórmulas) e mostra tudo para revisão antes de salvar. Testado com os cadernos 2026.1 e 2026.2 de `docs/` (`src/import/examParser.ts`). PDF escaneado (foto) não tem texto e não pode ser lido.
+- **Simulado de prova importada**: o caderno inteiro, na ordem, com 3h cronometradas (Simulado → Refazer uma prova importada).
+- **Listas e PDFs** (no estilo da skill Go, Julls!): lista de exercícios do banco (por matéria, tópico, prova ou só as erradas), prova completa para fazer no papel e **PDF de estudo de um tópico** (Mapa → tópico): por que importa, formulário, suas anotações e exercícios, com cartão-resposta e gabarito. No Android abre a impressão do sistema → "Salvar como PDF" (plugin nativo `PrintPlugin.java`); no navegador, Imprimir → Salvar como PDF. Questões de Matemática, Física e Química importadas saem como recorte do original, para não perder fórmulas e subscritos.
+- **Corrigir pelo número**: em cada lista/prova, diga só as que errou ("3, 7, 12-14") ou marque certo/errado/letra por número. O app grava as tentativas e manda as erradas para o **banco de erros** com o número da questão e o motivo; corrigir de novo não duplica.
+- **Excluir anotações e fotos**: lixeira na lista e na anotação (com confirmação; a exclusão vale para todos os aparelhos).
+- O app não tem IA embutida: os PDFs usam o que já está nele (anotações, formulário, banco de questões). Material com teoria nova continua vindo da skill `gojulls-pdf` no Claude.
+
 ---
 
 ## 7. Conferência com os PDFs em `docs/`

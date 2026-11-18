@@ -130,3 +130,17 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Caixas dos materiais (mesmo vocabulário do PDF) */
+.md .callout { @apply rounded-2xl border border-line bg-elevated px-4 py-3 my-3; }
+.md .callout-title { @apply font-bold flex items-center gap-2 mb-1 text-ink; }
+.md .callout .ci { @apply inline-grid place-items-center w-6 h-6 rounded-md bg-pink text-onpink text-sm font-black; }
+.md .callout.formula { @apply border-2 border-pink; }
+.md .callout.dica { border-left: 6px solid rgb(var(--pink)); }
+.md .callout.pegadinha, .md .callout.atencao { border-left: 6px solid rgb(var(--warn)); }
+.md .callout.pegadinha .ci, .md .callout.atencao .ci { @apply bg-warn; }
+.md .callout.exemplo { border-left: 6px solid rgb(var(--accent)); }
+.md .callout.resumo { @apply border-2 border-dashed border-pink; }
+.md h2 { @apply border-l-4 border-pink pl-2 mt-5; }
+.md table { @apply w-full border-collapse; }
+.md th { @apply bg-pink text-onpink text-left; }

@@ -231,7 +231,9 @@ export function planDay(input: PlannerInput): DayPlan {
   const bump = (s: SubjectId) => subjectCount.set(s, (subjectCount.get(s) ?? 0) + 1);
 
   // 1) Simulado na última semana (uma vez, se ainda não fez nenhum recente).
-  if (finalWeek && daysLeft >= 3 && daysLeft <= 6 && !input.recentMock && remaining >= 120) {
+  // Janela de 3 a 9 dias antes (pega um fim de semana); sem dia longo, simulado parcial a 3–4 dias.
+  const mockWindow = daysLeft >= 3 && daysLeft <= 9;
+  if (mockWindow && !input.recentMock && (remaining >= 120 || (daysLeft <= 4 && remaining >= 60))) {
     const minutes = Math.min(180, remaining);
     blocks.push({
       topicId: null,
@@ -296,7 +298,8 @@ export function planDay(input: PlannerInput): DayPlan {
     .filter((s) => !blocks.some((b) => b.subject === s));
   // Rotação de disciplinas de peso menor (bloco curto), se o dia tiver tempo.
   let rotationSubject: SubjectId | null = null;
-  if (input.minutesToday >= p.rotationMinMinutes) {
+  // Só reserva a rotação se, depois de simulado/redação, ainda sobra tempo para ela e para outro bloco.
+  if (input.minutesToday >= p.rotationMinMinutes && remaining >= p.rotationMinutes + p.minBlock) {
     rotationSubject =
       [...ROTATING]
         .filter((s) => (nBySubject.get(s) ?? 0) > 0)

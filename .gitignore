@@ -15,3 +15,8 @@ android/app/build/
 android/build/
 android/local.properties
 release/
+
+# PDFs pré-gerados da skill (o app gera os próprios)
+materiais/pdf/
+materiais/**/*.pdf
+materiais/**/*.html

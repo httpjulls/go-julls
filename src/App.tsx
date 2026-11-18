@@ -20,6 +20,10 @@ const Mock = lazy(() => import('./screens/Mock'));
 const Notes = lazy(() => import('./screens/Notes'));
 const Periodic = lazy(() => import('./screens/Periodic'));
 const Student = lazy(() => import('./screens/Student'));
+const Schedule = lazy(() => import('./screens/Schedule'));
+const Lists = lazy(() => import('./screens/Lists'));
+const MaterialScreen = lazy(() => import('./screens/MaterialScreen'));
+const MaterialsIndex = lazy(() => import('./screens/MaterialScreen').then((m) => ({ default: m.MaterialsIndex })));
 
 function Splash({ text }: { text?: string }) {
   return (
@@ -59,6 +63,10 @@ function Gate() {
           <Route path="foco" element={<Focus />} />
           <Route path="progresso" element={<Progress />} />
           <Route path="calendario" element={<Calendar />} />
+          <Route path="cronograma" element={<Schedule />} />
+          <Route path="listas/*" element={<Lists />} />
+          <Route path="material/:id" element={<MaterialScreen />} />
+          <Route path="biblioteca" element={<MaterialsIndex />} />
           <Route path="mais" element={<More />} />
           <Route path="config" element={<Settings />} />
           <Route path="flashcards/*" element={<Flashcards />} />

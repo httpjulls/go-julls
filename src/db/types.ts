@@ -101,6 +101,14 @@ export interface Question extends SyncRow {
   answer: Letter;
   solution: string;
   source: string;
+  /** prova importada de PDF (agrupa as questões de um mesmo caderno) */
+  examId?: string;
+  examName?: string;
+  /** número da questão no caderno */
+  number?: number;
+  language?: 'ingles' | 'espanhol';
+  /** fotos/recortes da página (ids de anexos) — figuras que o texto não captura */
+  images?: string[];
 }
 
 export interface QuestionAttempt extends SyncRow {
@@ -166,6 +174,12 @@ export interface Repertoire extends SyncRow {
 }
 
 export interface MockExam extends SyncRow {
+  /** simulado = sorteado do banco; prova = caderno importado na ordem; lista = folha de exercícios impressa */
+  kind?: 'simulado' | 'prova' | 'lista';
+  title?: string;
+  examId?: string;
+  /** duração cronometrada (min); padrão 180 */
+  durationMin?: number;
   day: DayKey;
   startedAt: string;
   finishedAt: string | null;

@@ -10,6 +10,7 @@ import { SUBJECT_NAMES, SUBJECT_POINTS, fmt, type SubjectId } from '../core/exam
 import { topicValue } from '../core/planner';
 import { weightedMastery } from '../core/projection';
 import { dayKey, formatDay, formatMinutes } from '../core/dates';
+import { MaterialButtons } from './MaterialButtons';
 import { Bar, Card, Empty, Icon, Markdown, MasteryPicker, Page, Section, Segmented, Sheet, cx } from '../ui/kit';
 
 const STATUS: { value: TopicStatus; label: string }[] = [
@@ -200,6 +201,8 @@ function TopicDetail({ id }: { id: string }) {
       )}
 
       <div className="grid grid-cols-2 gap-2">
+        <MaterialButtons topicId={id} topicName={topic.name} subjectName={SUBJECT_NAMES[topic.subject]} />
+        <Link to={`/listas/nova?topic=${id}&pacote=1`} className="btn-ghost col-span-2"><Icon name="download" size={18} /> PDF com minhas anotações e questões</Link>
         <Link to={`/anotacoes?topic=${id}`} className="btn-ghost"><Icon name="note" size={18} /> Anotações ({notes.filter((n) => n.kind === 'note' && !n.deleted).length})</Link>
         <Link to={`/flashcards?topic=${id}`} className="btn-ghost"><Icon name="cards" size={18} /> Flashcards ({counts?.cards ?? 0})</Link>
         <Link to={`/questoes?topic=${id}`} className="btn-ghost"><Icon name="quiz" size={18} /> Questões ({counts?.questions ?? 0})</Link>

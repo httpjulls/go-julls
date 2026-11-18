@@ -9,20 +9,14 @@ import { SUBJECT_NAMES, SUBJECT_SHORT, type SubjectId } from '../core/exam';
 import { SUBJECT_ORDER } from '../data/seed';
 import { Card, Empty, Icon, Markdown, Page, Segmented, cx } from '../ui/kit';
 import { takePhoto } from '../native/native';
-import { downloadAttachment, uploadAttachment } from '../sync/supabase';
+import { syncAttachments } from '../app/attachments';
 
-/** Sobe fotos pendentes e baixa as que faltam (quando há conta conectada). */
-async function syncAttachments(noteAttachments: string[]) {
-  const userId = (await db.meta.get('userId'))?.value as string | undefined;
-  if (!userId || !navigator.onLine) return;
-  for (const a of await db.attachments.filter((x) => !x.uploaded).toArray()) {
-    if (await uploadAttachment(userId, a.id, a.dataUrl)) await db.attachments.update(a.id, { uploaded: true });
-  }
-  for (const id of noteAttachments) {
-    if (await db.attachments.get(id)) continue;
-    const dataUrl = await downloadAttachment(userId, id);
-    if (dataUrl) await db.attachments.put({ id, dataUrl, uploaded: true, created: new Date().toISOString() });
-  }
+/** Exclui (lógico, sincroniza) com confirmação. Fórmulas do esqueleto também podem ser apagadas. */
+async function deleteNote(n: Note, after?: () => void) {
+  if (!confirm(`Excluir "${n.title}"${n.attachments.length ? ` e ${n.attachments.length} foto(s)` : ''}? Isso vale para todos os aparelhos.`)) return;
+  await repo.remove('notes', n.id);
+  await db.attachments.bulkDelete(n.attachments);
+  after?.();
 }
 
 export default function Notes({ kind }: { kind: 'note' | 'formula' }) {
@@ -84,13 +78,16 @@ export default function Notes({ kind }: { kind: 'note' | 'formula' }) {
       {list.length === 0 && <Empty>{kind === 'formula' ? 'Nada encontrado.' : 'Nenhuma anotação. Fotografe o caderno ou escreva um resumo.'}</Empty>}
       <ul className="space-y-2">
         {list.map((n) => (
-          <li key={n.id}>
-            <button className={cx('card !p-3 w-full text-left', id === n.id && 'ring-2 ring-pink')} onClick={() => setParams({ id: n.id, ...(topicFilter ? { topic: topicFilter } : {}) })}>
+          <li key={n.id} className="flex gap-2 items-stretch">
+            <button className={cx('card !p-3 flex-1 min-w-0 text-left', id === n.id && 'ring-2 ring-pink')} onClick={() => setParams({ id: n.id, ...(topicFilter ? { topic: topicFilter } : {}) })}>
               <p className="font-semibold">{n.title}</p>
               <p className="text-xs text-muted line-clamp-1">
                 {n.subject ? SUBJECT_SHORT[n.subject] : 'Geral'}
                 {n.attachments.length > 0 && ` · ${n.attachments.length} foto(s)`} · {n.body.slice(0, 80)}
               </p>
+            </button>
+            <button className="btn-ghost w-12 px-0 shrink-0" aria-label={`Excluir "${n.title}"`} onClick={() => void deleteNote(n, () => id === n.id && setParams({}))}>
+              <Icon name="trash" size={18} />
             </button>
           </li>
         ))}
@@ -180,23 +177,42 @@ function NoteEditor({ id, onDeleted }: { id: string; onDeleted: () => void }) {
           <textarea className="input min-h-[45vh] font-mono text-sm leading-relaxed" value={body} onChange={(e) => setDraft({ title, body: e.target.value })} aria-label="Texto em Markdown" placeholder="Markdown: # título, - lista, **negrito**" />
           <div className="flex gap-2">
             <button className="btn-primary flex-1" onClick={() => void save()}>Salvar</button>
-            <button className="btn-text text-warn" onClick={() => void repo.remove('notes', id).then(onDeleted)}>
+            <button className="btn-text text-warn" onClick={() => void deleteNote(note, onDeleted)}>
               <Icon name="trash" size={18} /> Excluir
             </button>
           </div>
         </Card>
       ) : (
         <Card>
-          <h2 className="text-xl font-bold mb-2">{note.title}</h2>
+          <div className="flex items-start gap-2 mb-2">
+            <h2 className="text-xl font-bold flex-1">{note.title}</h2>
+            <button className="btn-text text-warn" aria-label="Excluir anotação" onClick={() => void deleteNote(note, onDeleted)}>
+              <Icon name="trash" size={18} /> Excluir
+            </button>
+          </div>
           {note.body ? <Markdown text={note.body} /> : <p className="text-muted">Vazio. Toque em Editar.</p>}
         </Card>
       )}
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map((p) => (
-            <button key={p!.id} onClick={() => setZoom(p!.dataUrl)} className="aspect-square overflow-hidden rounded-xl border border-line">
-              <img src={p!.dataUrl} alt="Foto anexada" className="w-full h-full object-cover" />
-            </button>
+            <div key={p!.id} className="relative aspect-square">
+              <button onClick={() => setZoom(p!.dataUrl)} className="w-full h-full overflow-hidden rounded-xl border border-line" aria-label="Ampliar foto">
+                <img src={p!.dataUrl} alt="Foto anexada" className="w-full h-full object-cover" />
+              </button>
+              <button
+                className="absolute top-1 right-1 w-10 h-10 grid place-items-center rounded-full bg-bg/90 border border-line text-warn"
+                aria-label="Excluir foto"
+                onClick={async () => {
+                  if (!confirm('Excluir esta foto da anotação?')) return;
+                  await repo.update<Note>('notes', id, { attachments: note.attachments.filter((x) => x !== p!.id) });
+                  await db.attachments.delete(p!.id);
+                  toast('Foto excluída');
+                }}
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
           ))}
         </div>
       )}

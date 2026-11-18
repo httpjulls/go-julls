@@ -2,7 +2,7 @@
 import type { GoDb } from './db';
 import type { Essay, ErrorLog, MasteryLog, MockExam, PlanItem, QuestionAttempt, Settings, StudySession, Topic } from './types';
 import { addDays, dayKey, diffDays, weekday, type DayKey } from '../core/dates';
-import { planDay, type DayPlan, type PlannerTopic } from '../core/planner';
+import { planDay, type DayPlan, type PlannerInput, type PlannerTopic } from '../core/planner';
 import type { SubjectId } from '../core/exam';
 import { EXAM } from '../core/exam';
 import type { ProjectionTopic, AttemptStats } from '../core/projection';
@@ -126,7 +126,8 @@ export function lastEssayDay(essays: Essay[]): DayKey | null {
   return essays.reduce<DayKey | null>((m, e) => (!m || e.day > m ? e.day : m), null);
 }
 
-export function buildPlan(s: Snapshot, today = dayKey(), minutesOverride?: number): DayPlan {
+/** Entradas do planejador a partir do estado atual (sem os minutos do dia). */
+export function plannerBase(s: Snapshot, today = dayKey()): Omit<PlannerInput, 'today' | 'minutesToday'> {
   const topics: PlannerTopic[] = s.topics.map((t) => {
     const st = s.states.get(t.id)!;
     return {
@@ -141,16 +142,23 @@ export function buildPlan(s: Snapshot, today = dayKey(), minutesOverride?: numbe
       active: t.active,
     };
   });
-  const recentMock = s.mocks.some((m) => m.finishedAt && diffDays(m.day, today) <= 10);
-  return planDay({
-    today,
+  // Só simulado completo conta (listas impressas não).
+  const recentMock = s.mocks.some((m) => m.finishedAt && (m.kind ?? 'simulado') !== 'lista' && diffDays(m.day, today) <= 10);
+  return {
     examDate: s.settings.examDate,
-    minutesToday: minutesOverride ?? s.settings.minutesByWeekday[weekday(today)] ?? 0,
     topics,
     subjectLastStudied: subjectLastStudied(s.sessions),
     essayLastWritten: lastEssayDay(s.essays),
     recentMock,
     params: s.settings.plannerParams,
+  };
+}
+
+export function buildPlan(s: Snapshot, today = dayKey(), minutesOverride?: number): DayPlan {
+  return planDay({
+    ...plannerBase(s, today),
+    today,
+    minutesToday: minutesOverride ?? s.settings.minutesByWeekday[weekday(today)] ?? 0,
   });
 }
 
